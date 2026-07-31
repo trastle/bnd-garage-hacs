@@ -16,5 +16,19 @@
     "abort": {
       "already_configured": "This hub is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "B&D Smart Hub polling schedule",
+        "description": "How often to check the door/light status. A different, usually less frequent, interval can apply overnight.",
+        "data": {
+          "day_start": "Day starts at",
+          "day_end": "Day ends at (night starts)",
+          "day_interval_minutes": "Check interval during the day",
+          "night_interval_minutes": "Check interval overnight"
+        }
+      }
+    }
   }
 }

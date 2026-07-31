@@ -17,11 +17,14 @@ Because these are standard Home Assistant entity types, they work with everythin
 2. You'll need a registration/join code from the B&D app (wherever it shows the "add remote access" screen for a new device) and your B&D account password. The integration uses these once, to pair a brand-new client identity and bootstrap its own credentials (`app/remoteregister` → `app/v3migrate` → `auth`) - it never needs your account password again after setup, and never touches the account you use in the official app itself (this is a separate, independent client registration).
 3. Credentials are stored in Home Assistant's own config entry storage, not in any file inside this integration.
 
+## Polling schedule
+
+State (door position, light) is polled on a day/night schedule rather than one fixed interval - by default, every 3 minutes from 6am to 10pm and every 15 minutes overnight, on the theory that a physically idle garage door doesn't need checking as often while everyone's asleep. Configurable per-hub afterward via Settings → Devices & Services → B&D Smart Hub → Configure (day/night start times and both intervals). A command sent through Home Assistant (open/close/light) always triggers an immediate refresh regardless of the schedule.
+
 ## Known limitations
 
 - Only one hub/device has been tested against so far.
 - Door position is reported as closed/not-closed only - there's no confirmed data yet for what a partially-open position value looks like, so `current_cover_position` (a 0-100% value) isn't implemented, only `is_closed`/`is_opening`/`is_closing`.
-- Polls for state every 30s by default; commands (open/close/light) always trigger an immediate refresh regardless.
 - No re-authentication flow yet if a session ever needs refreshing - the credentials this integration uses (device identity + session key) haven't shown any expiry in testing so far, but if that ever changes, re-adding the integration is the current workaround.
 
 ## Attribution

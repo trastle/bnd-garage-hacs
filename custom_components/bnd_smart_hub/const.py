@@ -4,11 +4,21 @@ See ../../wan-api/README.md in the parent repo for the full protocol
 write-up this integration implements against.
 """
 
-from datetime import timedelta
-
 DOMAIN = "bnd_smart_hub"
 
-DEFAULT_UPDATE_INTERVAL = timedelta(seconds=30)
+# Options flow keys - how often to poll getDevices(), on a day/night
+# schedule (checking a physically-idle garage door every few seconds is
+# unnecessary; polling less often overnight is a reasonable default, not a
+# protocol requirement). All configurable via the integration's Options.
+CONF_DAY_START = "day_start"
+CONF_DAY_END = "day_end"
+CONF_DAY_INTERVAL_MINUTES = "day_interval_minutes"
+CONF_NIGHT_INTERVAL_MINUTES = "night_interval_minutes"
+
+DEFAULT_DAY_START = "06:00"
+DEFAULT_DAY_END = "22:00"
+DEFAULT_DAY_INTERVAL_MINUTES = 3
+DEFAULT_NIGHT_INTERVAL_MINUTES = 15
 
 # com.smartdoordevices.client.sdk.model.device.DeviceCommand - matches
 # sdd_client.DEVICE_COMMAND, duplicated here so config_flow/coordinator don't

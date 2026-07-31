@@ -19,11 +19,22 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from . import sdd_client
-from .const import DOMAIN
+from .const import (
+    CONF_DAY_END,
+    CONF_DAY_INTERVAL_MINUTES,
+    CONF_DAY_START,
+    CONF_NIGHT_INTERVAL_MINUTES,
+    DEFAULT_DAY_END,
+    DEFAULT_DAY_INTERVAL_MINUTES,
+    DEFAULT_DAY_START,
+    DEFAULT_NIGHT_INTERVAL_MINUTES,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -111,3 +122,36 @@ class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=creds.get("name") or "B&D Smart Hub", data=creds)
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> BnDSmartHubOptionsFlow:
+        return BnDSmartHubOptionsFlow()
+
+
+class BnDSmartHubOptionsFlow(config_entries.OptionsFlow):
+    """Lets a user tune the day/night poll schedule after setup."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        options = self.config_entry.options
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_DAY_START, default=options.get(CONF_DAY_START, DEFAULT_DAY_START)): selector.TimeSelector(),
+                vol.Required(CONF_DAY_END, default=options.get(CONF_DAY_END, DEFAULT_DAY_END)): selector.TimeSelector(),
+                vol.Required(
+                    CONF_DAY_INTERVAL_MINUTES, default=options.get(CONF_DAY_INTERVAL_MINUTES, DEFAULT_DAY_INTERVAL_MINUTES)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=1440, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
+                ),
+                vol.Required(
+                    CONF_NIGHT_INTERVAL_MINUTES,
+                    default=options.get(CONF_NIGHT_INTERVAL_MINUTES, DEFAULT_NIGHT_INTERVAL_MINUTES),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=1440, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
+                ),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
