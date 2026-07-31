@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect your B&D Smart Hub",
-        "description": "Enter a registration/join code from the B&D app (wherever it shows the \"add remote access\" screen for a new device) and your B&D account password. These are used once, to register this Home Assistant instance as its own independent client - your account password is never stored.",
+        "description": "Enter a registration/join code from the B&D app (wherever it shows the \"add remote access\" screen for a new device) and your B&D account password. These register this Home Assistant instance as its own independent client, separate from the account you use in the official app. Your account password is stored so this integration can periodically re-authenticate on its own.",
         "data": {
           "join_code": "Registration/join code",
           "password": "B&D account password"

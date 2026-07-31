@@ -3,10 +3,13 @@
 Mirrors the reference CLI's `setup` command (see the sibling research repo's
 wan-api/client/cli.py and wan-api/README.md for the protocol this drives):
 pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
-completes) -> auth (appv3/message path=auth). Runs once, at setup time; the
-account password is used only here and never stored - what gets saved as
-the config entry's data is the resulting device credential set (bsid,
-phoneId, phoneSecret, phonePassword, phoneKey, hubKey, sessionKey).
+completes) -> auth (appv3/message path=auth). Runs once, at setup time. The
+account password IS stored as part of the config entry's data (alongside
+the device credential set: bsid, phoneId, phoneSecret, phonePassword,
+phoneKey, hubKey, sessionKey) - the coordinator needs it to proactively
+re-authenticate every 24h (see coordinator.py), matching how the real app
+itself resends the real password on every login rather than treating it as
+a one-time bootstrap secret.
 """
 
 from __future__ import annotations
@@ -98,6 +101,11 @@ def _do_setup(join_code: str, password: str) -> dict:
     if not session_key:
         raise sdd_client.SddError(f"auth succeeded but no session key in the response: {auth_result}")
     creds["sessionKey"] = session_key
+    # Stored so the coordinator can proactively re-authenticate every 24h
+    # (see coordinator.py) - authenticate() genuinely needs the real account
+    # password every time, the same way the real app itself resends it on
+    # every login rather than treating it as a one-time bootstrap secret.
+    creds["accountPassword"] = password
     return creds
 
 

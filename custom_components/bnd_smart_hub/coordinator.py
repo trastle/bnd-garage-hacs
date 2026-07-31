@@ -8,6 +8,12 @@ config_flow.py) rather than a single fixed interval - a physically idle
 garage door doesn't need checking as often overnight. A command
 (open/close/light) always triggers its own immediate refresh regardless of
 the schedule.
+
+Every refresh also checks whether it's time to proactively re-authenticate
+(TOKEN_REFRESH_INTERVAL, 24h) - nothing in testing has shown the session key
+actually expiring, so this is defensive/"for good measure" rather than a fix
+for a known failure, and soft-fails (log + retry next cycle) rather than
+breaking the whole update if the re-auth attempt itself fails.
 """
 
 from __future__ import annotations
@@ -36,6 +42,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+TOKEN_REFRESH_INTERVAL = timedelta(hours=24)
+
 
 class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     """Holds the credential set for one hub and polls its device list."""
@@ -47,8 +55,17 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self.bsid: str = data["bsid"]
         self.phone_id: str = data["phoneId"]
         self.phone_secret: str = data["phoneSecret"]
+        self.phone_password: str = data["phonePassword"]
         self.phone_key: str = data["phoneKey"]
         self.session_key: str = data["sessionKey"]
+        self.account_password: str = data["accountPassword"]
+        # Assume the just-completed config flow auth counts as the first
+        # refresh, so the first proactive one lands ~24h from setup, not
+        # immediately. Not persisted across a Home Assistant restart - if HA
+        # restarts more often than every 24h, the timer effectively resets
+        # each time. Acceptable for a defensive/"for good measure" refresh,
+        # not worth the complexity of persisting it for now.
+        self._last_token_refresh = dt_util.utcnow()
 
     def _scheduled_interval(self) -> timedelta:
         """The poll interval for right now, per the configured day/night
@@ -66,12 +83,39 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         )
         return timedelta(minutes=minutes)
 
+    async def _async_refresh_token_if_due(self) -> None:
+        if dt_util.utcnow() - self._last_token_refresh < TOKEN_REFRESH_INTERVAL:
+            return
+        try:
+            auth_result = await self.hass.async_add_executor_job(
+                sdd_client.authenticate,
+                self.bsid,
+                self.phone_id,
+                self.phone_secret,
+                self.phone_password,
+                self.account_password,
+                False,  # temporary
+                self.phone_key,
+            )
+        except sdd_client.SddError as err:
+            _LOGGER.warning("Proactive B&D Smart Hub token refresh failed, will retry next cycle: %s", err)
+            return
+        session_key = auth_result.get("data", {}).get("key")
+        if not session_key:
+            _LOGGER.warning("Proactive token refresh got a response with no session key, will retry next cycle")
+            return
+        self.session_key = session_key
+        self._last_token_refresh = dt_util.utcnow()
+        self.hass.config_entries.async_update_entry(self.entry, data={**self.entry.data, "sessionKey": session_key})
+        _LOGGER.debug("Proactively refreshed the B&D Smart Hub session key")
+
     async def _async_update_data(self) -> dict[str, dict]:
         # Recomputed on every refresh (not just at startup) so a day/night
         # boundary crossing or an options change is picked up for the *next*
         # scheduled call - DataUpdateCoordinator reads self.update_interval
         # again each time it reschedules itself.
         self.update_interval = self._scheduled_interval()
+        await self._async_refresh_token_if_due()
         try:
             response = await self.hass.async_add_executor_job(
                 sdd_client.get_devices,
