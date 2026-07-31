@@ -6,6 +6,8 @@ This is a standalone Home Assistant custom integration (HACS-installable) for th
 
 The WAN API this integration talks to was reverse-engineered in a sibling repo, `../garage-door/` (private, not published) - see `../garage-door/wan-api/README.md` for the full protocol spec, decryption schemes, and session logs explaining how each piece was confirmed. `custom_components/bnd_smart_hub/sdd_client.py` here is a **copy** of `../garage-door/wan-api/client/sdd_client.py` (that repo's copy is the canonical one, with its own test suite) - keep them in sync manually when the protocol implementation changes. If this repo is ever published independently, that cross-reference stops resolving for other readers; replace it with whatever public write-up (if any) makes sense at that point.
 
+`custom_components/bnd_smart_hub/sdd-cloud-ca.pem` is likewise a copy of `../garage-door/wan-api/reference/sdd-cloud-ca.pem` (the private CA `sdd_client.py` needs to validate `version3.smartdoordevices.com`'s cert chain) - it has to live **inside** `custom_components/bnd_smart_hub/` here, not in a sibling `reference/` dir like the source repo's layout, because HACS only ever pulls the `custom_components/bnd_smart_hub/` directory itself. `CA_BUNDLE_PATH` in `sdd_client.py` was adjusted accordingly when copying it over - don't blindly copy that one line verbatim from the source repo if it changes there.
+
 ## Structure
 
 - `custom_components/bnd_smart_hub/` - the actual integration, standard HA custom component layout (`manifest.json`, `config_flow.py`, `coordinator.py`, entity platforms, `translations/`).

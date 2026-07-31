@@ -85,8 +85,12 @@ REQUEST_TIMEOUT_SECONDS = 15
 # this exact intermediate cert instead of the public trust store (see
 # com.smartdoordevices.client.sdk.d.i.b() in the decompiled SDK). Extracted
 # from the app's own bundled BKS keystore (res/raw/smartdoordevices_intermediate_v2.bks)
-# via `keytool -exportcert`, see ../README.md for how.
-CA_BUNDLE_PATH = Path(__file__).parent.parent / "reference" / "sdd-cloud-ca.pem"
+# via `keytool -exportcert`, see the sibling research repo's wan-api/README.md for how.
+#
+# Kept alongside this file (not a sibling "reference/" dir like the source
+# copy) because HACS only ever pulls custom_components/bnd_smart_hub/ itself -
+# anything this integration needs at runtime has to live inside that directory.
+CA_BUNDLE_PATH = Path(__file__).parent / "sdd-cloud-ca.pem"
 
 _HEADERS = {
     "Content-Type": "application/json",
