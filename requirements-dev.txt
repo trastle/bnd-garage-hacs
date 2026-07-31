@@ -1,0 +1,4 @@
+pytest
+cryptography>=41.0
+pycryptodome>=3.19
+requests>=2.31
