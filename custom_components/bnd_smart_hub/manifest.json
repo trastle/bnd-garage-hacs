@@ -1,0 +1,10 @@
+{
+  "domain": "bnd_smart_hub",
+  "name": "B&D Smart Hub",
+  "version": "0.1.0",
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "integration_type": "hub",
+  "requirements": ["pycryptodome>=3.19", "cryptography>=41.0", "requests>=2.31"],
+  "codeowners": []
+}

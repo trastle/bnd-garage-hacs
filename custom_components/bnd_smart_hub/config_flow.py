@@ -1,0 +1,113 @@
+"""Config flow for the B&D Smart Hub integration.
+
+Mirrors the reference CLI's `setup` command (see the sibling research repo's
+wan-api/client/cli.py and wan-api/README.md for the protocol this drives):
+pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
+completes) -> auth (appv3/message path=auth). Runs once, at setup time; the
+account password is used only here and never stored - what gets saved as
+the config entry's data is the resulting device credential set (bsid,
+phoneId, phoneSecret, phonePassword, phoneKey, hubKey, sessionKey).
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
+
+from . import sdd_client
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+CONF_JOIN_CODE = "join_code"
+
+MIGRATE_TIMEOUT_SECONDS = 30
+MIGRATE_POLL_INTERVAL_SECONDS = 1.0
+
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_JOIN_CODE): str,
+        vol.Required(CONF_PASSWORD): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        ),
+    }
+)
+
+
+def _do_setup(join_code: str, password: str) -> dict:
+    """Run pair -> migrate -> auth synchronously; call via executor job.
+
+    Raises sdd_client.SddError on any real failure. Returns the full
+    credential dict to store as the config entry's data.
+    """
+    pair_result = sdd_client.remote_register(join_code, password)
+
+    # v3migrate_prepare() generates the RSA/EC keypair and random
+    # newPhonePassword ONCE - reusing that same session across every retry
+    # below matters, the server needs the same keys resent on every attempt
+    # (see the reference repo's wan-api/README.md "app/v3migrate" for why).
+    session = sdd_client.v3migrate_prepare(
+        bsid=pair_result["bsid"],
+        phone_id=pair_result["phoneId"],
+        legacy_phone_secret=pair_result["phoneSecret"],
+        legacy_phone_password=pair_result["phonePassword"],
+        user_password=password,
+    )
+    deadline = time.monotonic() + MIGRATE_TIMEOUT_SECONDS
+    migrate_result: dict = {"pending": True}
+    while migrate_result.get("pending"):
+        migrate_result = sdd_client.v3migrate_attempt(session)
+        if migrate_result.get("pending"):
+            if time.monotonic() >= deadline:
+                raise sdd_client.SddError(
+                    f"app/v3migrate never completed after {MIGRATE_TIMEOUT_SECONDS}s "
+                    f"- last ack: {migrate_result.get('ack')}"
+                )
+            time.sleep(MIGRATE_POLL_INTERVAL_SECONDS)
+
+    creds = {**pair_result, **migrate_result}
+
+    auth_result = sdd_client.authenticate(
+        bsid=creds["bsid"],
+        phone_id=creds["phoneId"],
+        phone_secret=creds["phoneSecret"],
+        phone_password=creds["phonePassword"],
+        user_password=password,
+        phone_key=creds["phoneKey"],
+    )
+    session_key = auth_result.get("data", {}).get("key")
+    if not session_key:
+        raise sdd_client.SddError(f"auth succeeded but no session key in the response: {auth_result}")
+    creds["sessionKey"] = session_key
+    return creds
+
+
+class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for B&D Smart Hub."""
+
+    VERSION = 1
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                creds = await self.hass.async_add_executor_job(
+                    _do_setup, user_input[CONF_JOIN_CODE], user_input[CONF_PASSWORD]
+                )
+            except sdd_client.SddError as err:
+                _LOGGER.error("B&D Smart Hub setup failed: %s", err)
+                errors["base"] = "cannot_connect"
+            else:
+                await self.async_set_unique_id(creds["bsid"])
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=creds.get("name") or "B&D Smart Hub", data=creds)
+
+        return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
