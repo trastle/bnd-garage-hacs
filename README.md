@@ -1,4 +1,4 @@
-# B&D Smart Hub for Home Assistant
+# Smart Door Devices Hub for Home Assistant
 
 A Home Assistant custom integration for garage door hubs built on the **Smart Door Devices (SDD)** platform - the shared cloud backend behind several garage door brands' apps, including B&D's "Smart Garage Access" (see **Brands using SDD** below). No local network access to the hub is required - everything goes over the same WAN/cloud protocol those apps use.
 
@@ -21,14 +21,14 @@ This integration has only been built and tested against a B&D hub (see **Tested 
 ## Installation
 
 1. In HACS: the "⋮" menu → **Custom repositories** → add this repository's URL, category "Integration".
-2. Find "B&D Smart Hub" in the HACS list and click **Download**.
+2. Find "Smart Door Devices Hub" in the HACS list and click **Download**.
 3. Restart Home Assistant.
 
 (Without HACS: copy `custom_components/bnd_smart_hub/` into your `config/custom_components/` directory instead, then restart.)
 
 ## Setup
 
-1. Settings → Devices & Services → Add Integration → **B&D Smart Hub**.
+1. Settings → Devices & Services → Add Integration → **Smart Door Devices Hub**.
 2. Enter a registration/join code from your app (B&D, ATA, Dominator, Garador - wherever it shows the "add remote access" screen for a new device) and your account password for that app. This pairs a brand-new, independent client identity - separate from the account you use in the app itself.
 3. **Your account password is stored** as part of the resulting config entry, alongside the device credentials it produces - not written to any separate file, but it does sit in Home Assistant's own config storage (plaintext JSON on disk, protected only by OS file permissions, same as several other cloud integrations that need standing credentials). This is a deliberate tradeoff: the integration needs it to proactively re-authenticate every 24h (see below), the same way the app itself resends the actual account password on every login rather than treating it as a one-time secret.
 
@@ -49,7 +49,7 @@ Sending a command (open/close/stop/light) gives immediate feedback rather than w
 
 ### Polling schedule
 
-Outside of the fast-polling burst above, state (door position, light) is checked on a day/night schedule rather than one fixed interval - by default, every 3 minutes from 6am to 10pm and every 15 minutes overnight, on the theory that a physically idle garage door doesn't need checking as often while everyone's asleep. Configurable per-hub via Settings → Devices & Services → B&D Smart Hub → **Configure** (day/night start times and both intervals).
+Outside of the fast-polling burst above, state (door position, light) is checked on a day/night schedule rather than one fixed interval - by default, every 3 minutes from 6am to 10pm and every 15 minutes overnight, on the theory that a physically idle garage door doesn't need checking as often while everyone's asleep. Configurable per-hub via Settings → Devices & Services → Smart Door Devices Hub → **Configure** (day/night start times and both intervals).
 
 ### Session refresh
 
@@ -69,4 +69,4 @@ Only one combination has been confirmed so far. If you try this on a different m
 
 ## Attribution
 
-The SDD WAN API this integration talks to isn't officially documented - it was reverse-engineered from one of the apps in the brand family above via static analysis and live traffic capture. This repo doesn't include that research; it only implements the resulting protocol.
+The SDD WAN API this integration talks to isn't officially documented - it was reverse-engineered from one of the apps in the brand family above via static analysis and live traffic capture.

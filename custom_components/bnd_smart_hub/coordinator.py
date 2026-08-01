@@ -163,7 +163,7 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 self.phone_key,
             )
         except sdd_client.SddError as err:
-            _LOGGER.warning("Proactive B&D Smart Hub token refresh failed, will retry next cycle: %s", err)
+            _LOGGER.warning("Proactive Smart Door Devices Hub token refresh failed, will retry next cycle: %s", err)
             return
         session_key = auth_result.get("data", {}).get("key")
         if not session_key:
@@ -172,7 +172,7 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self.session_key = session_key
         self._last_token_refresh = dt_util.utcnow()
         self.hass.config_entries.async_update_entry(self.entry, data={**self.entry.data, "sessionKey": session_key})
-        _LOGGER.debug("Proactively refreshed the B&D Smart Hub session key")
+        _LOGGER.debug("Proactively refreshed the Smart Door Devices Hub session key")
 
     async def _async_update_data(self) -> dict[str, dict]:
         # Recomputed on every refresh (not just at startup) so a day/night
@@ -191,7 +191,7 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 self.phone_key,
             )
         except sdd_client.SddError as err:
-            raise UpdateFailed(f"Error talking to the B&D Smart Hub API: {err}") from err
+            raise UpdateFailed(f"Error talking to the Smart Door Devices Hub API: {err}") from err
         devices = response.get("data", [])
         data = {device["deviceId"]: device for device in devices}
 

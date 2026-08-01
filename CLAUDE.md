@@ -1,6 +1,8 @@
 # Working conventions for this repo
 
-This is a standalone Home Assistant custom integration (HACS-installable) for the B&D Smart Hub garage door controller, talking to the Smart Door Devices (SDD) WAN cloud API.
+This is a standalone Home Assistant custom integration (HACS-installable) for garage door hubs on the Smart Door Devices (SDD) WAN cloud API, currently tested against a B&D hub.
+
+**Display name vs domain**: published under the name "Smart Door Devices Hub", but the `domain` (`bnd_smart_hub`, set in `manifest.json` and `const.py`) is unchanged from this integration's original name and must stay that way - Home Assistant has no migration path for changing a `config_entries` domain, so changing it would orphan every existing install's config entry and entities. Only the human-facing name changes (`manifest.json`'s `name`, `hacs.json`'s `name`, `strings.json`/`translations/en.json`, and log/title strings in the code) - Python identifiers like `BnDSmartHubCoordinator` were deliberately left alone too, since renaming those is a purely internal, non-user-visible choice with no bearing on the domain question.
 
 ## The CA trust file
 

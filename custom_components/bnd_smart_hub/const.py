@@ -1,5 +1,9 @@
-"""Constants for the B&D Smart Hub integration."""
+"""Constants for the Smart Door Devices Hub integration."""
 
+# Kept as "bnd_smart_hub" even though the display name is now "Smart Door
+# Devices Hub" - Home Assistant has no migration path for changing a
+# config_entries domain, so changing this would orphan every existing
+# config entry and entity.
 DOMAIN = "bnd_smart_hub"
 
 # Options flow keys - how often to poll getDevices(), on a day/night

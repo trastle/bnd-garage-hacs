@@ -1,5 +1,11 @@
-"""The B&D Smart Hub integration - see sdd_client.py for the underlying
-Smart Door Devices (SDD) cloud API client it's built on.
+"""The Smart Door Devices Hub integration - see sdd_client.py for the
+underlying Smart Door Devices (SDD) cloud API client it's built on.
+
+Published under the display name "Smart Door Devices Hub" but kept on its
+original domain, "bnd_smart_hub", for backwards compatibility with existing
+installs - renaming a config_entries domain has no automatic migration path
+in Home Assistant, so changing it would orphan every existing config entry
+and entity.
 """
 
 from __future__ import annotations

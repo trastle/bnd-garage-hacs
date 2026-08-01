@@ -1,4 +1,4 @@
-"""Config flow for the B&D Smart Hub integration.
+"""Config flow for the Smart Door Devices Hub integration.
 
 Runs the Smart Door Devices (SDD) client bootstrap chain once, at setup
 time: pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
@@ -110,7 +110,7 @@ def _do_setup(join_code: str, password: str) -> dict:
 
 class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for an SDD-platform garage hub, published here
-    as "B&D Smart Hub".
+    as "Smart Door Devices Hub".
     """
 
     VERSION = 1
@@ -123,12 +123,12 @@ class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _do_setup, user_input[CONF_JOIN_CODE], user_input[CONF_PASSWORD]
                 )
             except sdd_client.SddError as err:
-                _LOGGER.error("B&D Smart Hub setup failed: %s", err)
+                _LOGGER.error("Smart Door Devices Hub setup failed: %s", err)
                 errors["base"] = "cannot_connect"
             else:
                 await self.async_set_unique_id(creds["bsid"])
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=creds.get("name") or "B&D Smart Hub", data=creds)
+                return self.async_create_entry(title=creds.get("name") or "Smart Door Devices Hub", data=creds)
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
 
