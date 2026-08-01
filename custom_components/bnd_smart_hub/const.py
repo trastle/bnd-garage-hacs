@@ -1,8 +1,4 @@
-"""Constants for the B&D Smart Hub integration.
-
-See the sibling research repo's wan-api/README.md for the full Smart Door
-Devices (SDD) protocol write-up this integration implements against.
-"""
+"""Constants for the B&D Smart Hub integration."""
 
 DOMAIN = "bnd_smart_hub"
 
@@ -29,8 +25,7 @@ DEVICE_COMMAND_LIGHT_ON = "LIGHT_ON"
 DEVICE_COMMAND_LIGHT_OFF = "LIGHT_OFF"
 
 # Raw deviceCommand integer codes that mean "the door is currently moving in
-# this direction" when seen in a device's pendingCommand field - see the
-# sibling research repo's wan-api/README.md DeviceCommand table. PART_OPEN_1/
+# this direction" when seen in a device's pendingCommand field. PART_OPEN_1/
 # 2/3 and the OPEN_PERCENT_* codes also mean "opening" but haven't been
 # exercised live; only the plain OPEN/CLOSE codes are included here
 # deliberately.

@@ -1,10 +1,9 @@
 """Config flow for the B&D Smart Hub integration.
 
-Mirrors the reference CLI's `setup` command (see the sibling research repo's
-wan-api/client/cli.py and wan-api/README.md for the Smart Door Devices (SDD)
-protocol this drives): pair (app/remoteregister) -> migrate (app/v3migrate,
-retried until it completes) -> auth (appv3/message path=auth). Runs once, at
-setup time. The account password IS stored as part of the config entry's
+Runs the Smart Door Devices (SDD) client bootstrap chain once, at setup
+time: pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
+completes) -> auth (appv3/message path=auth). The account password IS
+stored as part of the config entry's
 data (alongside the device credential set: bsid, phoneId, phoneSecret,
 phonePassword, phoneKey, hubKey, sessionKey) - the coordinator needs it to
 proactively re-authenticate every 24h (see coordinator.py), matching how the
@@ -67,7 +66,7 @@ def _do_setup(join_code: str, password: str) -> dict:
     # v3migrate_prepare() generates the RSA/EC keypair and random
     # newPhonePassword ONCE - reusing that same session across every retry
     # below matters, the server needs the same keys resent on every attempt
-    # (see the reference repo's wan-api/README.md "app/v3migrate" for why).
+    # (see v3migrate_prepare()'s docstring in sdd_client.py for why).
     session = sdd_client.v3migrate_prepare(
         bsid=pair_result["bsid"],
         phone_id=pair_result["phoneId"],

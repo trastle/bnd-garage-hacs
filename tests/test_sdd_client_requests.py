@@ -2,11 +2,8 @@
 Tests that lock in the exact HTTP request shapes for each SDD API call, using
 a mocked requests.post - no network access, no real credentials involved.
 
-Copied from the canonical test suite in the sibling research repo
-(../../garage-door/wan-api/client/tests/test_requests.py) - keep in sync
-manually alongside sdd_client.py itself (see ../CLAUDE.md). These freeze in
-what's been confirmed correct against the real server so a future refactor
-can't silently drift away from a working request shape.
+These freeze in what's been confirmed correct against the real server so a
+future refactor can't silently drift away from a working request shape.
 """
 
 import base64
@@ -88,8 +85,7 @@ def test_remote_register_request_shape(mock_post):
 @patch("sdd_client.requests.post")
 def test_authenticate_request_shape(mock_post):
     # authenticate() is the REAL session-establishment call (path "auth" over
-    # appv3/message) - see the sibling repo's wan-api/README.md "Which
-    # endpoints are real".
+    # appv3/message), not app/connect.
     fake_response_data = {"data": {"duration": {"value": 0}, "key": "sess-key-1", "expiresIn": 0}, "errorCode": 0, "state": 0}
     mock_post.side_effect = _message_then_poll_side_effect("secret1", fake_response_data)
     result = sdd_client.authenticate(bsid="bsid1", phone_id="phone1", phone_secret="secret1", phone_password="pw1")

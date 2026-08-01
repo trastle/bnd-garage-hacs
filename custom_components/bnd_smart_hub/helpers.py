@@ -14,10 +14,9 @@ def is_closed(device: dict) -> bool | None:
     """True if the door is closed, False if not, None if unknown.
 
     The only field confirmed live so far is that `position == 0` means
-    closed (see ../../wan-api/README.md "getDevices()") - there's no
-    confirmed data for what a fully-open position value looks like, so
-    treat any other position as simply "not closed" rather than guessing
-    at a percentage.
+    closed - there's no confirmed data for what a fully-open position value
+    looks like, so treat any other position as simply "not closed" rather
+    than guessing at a percentage.
     """
     position = device.get("position")
     if position is None:

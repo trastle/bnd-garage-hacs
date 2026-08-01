@@ -80,9 +80,9 @@ REQUEST_TIMEOUT_SECONDS = 15
 # and its issuer name matches what the app-extracted intermediate independently reported as
 # ITS issuer, which is decent corroboration.
 #
-# Kept alongside this file (not a sibling "reference/" dir like the source
-# copy) because HACS only ever pulls custom_components/bnd_smart_hub/ itself -
-# anything this integration needs at runtime has to live inside that directory.
+# Kept alongside this file (not a sibling "reference/" dir) because HACS
+# only ever pulls custom_components/bnd_smart_hub/ itself - anything this
+# integration needs at runtime has to live inside that directory.
 CA_BUNDLE_PATH = Path(__file__).parent / "sdd-root-ca-public.pem"
 
 _HEADERS = {
