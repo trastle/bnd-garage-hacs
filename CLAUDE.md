@@ -1,10 +1,10 @@
 # Working conventions for this repo
 
-This is a standalone Home Assistant custom integration (HACS-installable) for the B&D Smart Hub garage door controller (SDD WAN cloud API). It contains only the finished integration - no reverse-engineering notes, session logs, or research artifacts.
+This is a standalone Home Assistant custom integration (HACS-installable) for the B&D Smart Hub garage door controller, talking to the Smart Door Devices (SDD) WAN cloud API.
 
 ## The CA trust file
 
-`custom_components/bnd_smart_hub/sdd-root-ca-public.pem` is the CA cert `sdd_client.py` needs to validate `version3.smartdoordevices.com`'s cert chain - it has to live **inside** `custom_components/bnd_smart_hub/` here, not in a sibling `reference/` dir, because HACS only ever pulls the `custom_components/bnd_smart_hub/` directory itself. `CA_BUNDLE_PATH` in `sdd_client.py` points at it.
+`custom_components/bnd_smart_hub/sdd-root-ca-public.pem` is the CA cert `sdd_client.py` needs to validate `version3.smartdoordevices.com`'s cert chain. It has to live **inside** `custom_components/bnd_smart_hub/` because HACS only ever pulls that directory - anything this integration needs at runtime has to be in there, not in a separate top-level directory. `CA_BUNDLE_PATH` in `sdd_client.py` points at it.
 
 This is SmartDoorDevices' **Root** CA, not the Intermediate CA the official app itself pins to - deliberately, so a future intermediate rotation validates automatically without needing a new release of this integration (see the detailed comment above `CA_BUNDLE_PATH` in `sdd_client.py` for the full reasoning). **Provenance matters here**: this file came from a direct live TLS connection to `version3.smartdoordevices.com` from the public internet (`openssl s_client -showcerts`), not from extracting anything out of the official app's own bundled keystore. If this file is ever regenerated, keep noting which method produced it - a live TLS fetch and an app-extracted artifact carry meaningfully different trust weight and shouldn't get conflated.
 
