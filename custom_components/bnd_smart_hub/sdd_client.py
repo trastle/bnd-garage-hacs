@@ -1,27 +1,21 @@
 """
-Standalone client for the B&D / "Smart Door Devices" (SDD) WAN cloud API.
+Standalone client for the B&D Smart Hub ("Smart Door Devices" / SDD) WAN
+cloud API - the same cloud service the official B&D Smart Garage Access app
+talks to. Covers the full client lifecycle: pairing a new client with a join
+code (remote_register()), upgrading that pairing into a full session
+credential set (v3migrate_prepare()/v3migrate_attempt()), authenticating
+(authenticate()), and day-to-day operation (get_devices(),
+send_device_command(), get_device_logs()).
 
-**This is a copy of ../../wan-api/client/sdd_client.py** (that's the
-canonical, tested copy - see its test suite at
+**This is a copy of ../../wan-api/client/sdd_client.py** in the sibling
+research repo (that's the canonical, tested copy - see its test suite at
 ../../wan-api/client/tests/). This copy exists because HACS only
 distributes the contents of custom_components/<domain>/, so the integration
 needs to be self-contained rather than importing across the parent repo.
 Keep the two in sync manually when the protocol implementation changes.
 
-Reconstructed entirely via static analysis of the official B&D Smart Garage
-Access Android app (au.com.bnd.controlladoor) - see ../../wan-api/README.md
-for the full protocol write-up this implements, and
-../../session-notes-2026-07-30.md for how it was derived.
-
-Status (2026-07-31): the entire fresh-client bootstrap chain - pair (
-remote_register()) -> migrate (v3migrate_prepare()/v3migrate_attempt()) ->
-auth (authenticate()) - plus get_devices()/send_device_command()/
-get_device_logs(), is confirmed working end-to-end against the real server,
-with no Frida extraction involved anywhere. See ../../wan-api/README.md
-"Current status" for the full story.
-
-Never hardcode real credentials in this file or commit them anywhere in this
-repo - see ../../credentials.md.
+Never hardcode real credentials in this file, or commit them anywhere in
+this repo.
 """
 
 from __future__ import annotations
@@ -50,50 +44,40 @@ SDK_VERSION = "2.21.1"
 USER_AGENT = f"sddAndroid-{SDK_VERSION}-python-client(35)"
 
 # --------------------------------------------------------------------------
-# Endpoints - see ../README.md "Which endpoints are actually real"
-# for the full story. Two generations of endpoint exist in the decompiled SDK;
-# don't assume a path found in com.smartdoordevices.client.sdk.d.p is live.
+# Endpoints this client uses:
 #
-# REAL (confirmed live, used by the current v3 web channel, e/g.java):
-#   app/remoteregister  - pairing via join code (confirmed working 2026-07-30)
-#   appv3/message        - the one true RPC endpoint: auth, getDevices,
-#                          sendDeviceCommand, everything, all via the
-#                          encrypted path/data envelope
-#   appv3/poll           - long-poll channel for async message delivery
-#   appv3/hubinfo        - not yet explored
+#   app/remoteregister - pairs a new client using a join code from the B&D app.
+#   app/v3migrate       - one-time upgrade of that pairing into a full v3
+#                         session credential set (see v3migrate_prepare()/
+#                         v3migrate_attempt()).
+#   appv3/message       - the one RPC endpoint: auth, getDevices,
+#                         sendDeviceCommand, everything, all via an
+#                         encrypted path/data envelope (see
+#                         _signed_message_body()).
+#   appv3/poll          - long-poll channel real RPC responses and
+#                         unsolicited device events are delivered through
+#                         (see poll()).
 #
-# LEGACY-ONLY (only reachable via the v2->v3 credential migration path,
-# d/j.java LegacyCredentialMigrator - NOT part of a fresh v3 client's flow):
-#   app/connect          - what this client first (incorrectly) tried to use
-#                          for session establishment; it 400's uniformly
-#                          regardless of credentials because a fresh v3
-#                          account's HubConnection.connect() (e/e.java) never
-#                          calls it at all unless the account is flagged
-#                          legacy
-#   app/v3migrate
-#   app/connectrestricted, app/time, app/action - constants exist in d/p.java
-#                          but no call site was found anywhere in the SDK;
-#                          likely dead/reserved
+# app/connect is never used by this client - it's a session-establishment
+# endpoint that only applies to accounts still on the legacy credential
+# format; a client that's been through app/v3migrate never needs it.
 # --------------------------------------------------------------------------
 APPV3_MESSAGE_PATH = "appv3/message"
 
 REQUEST_TIMEOUT_SECONDS = 15
 
-# The server presents a chain signed by SmartDoorDevices' own private CA, which
-# is why plain requests (using the public CA bundle) rejects it with
-# "self-signed certificate in certificate chain" - the app validates against
-# this same private CA instead of the public trust store (see
-# com.smartdoordevices.client.sdk.d.i.b() in the decompiled SDK, which pins to
-# the intermediate specifically).
+# The server presents a certificate chain signed by its own private CA, so
+# requests need a trusted copy of that CA to validate it - the public CA
+# trust store alone rejects it with "self-signed certificate in certificate
+# chain". The official app pins to the Intermediate CA specifically.
 #
-# We trust the ROOT CA here instead of the intermediate the app itself pins
-# to, deliberately: the server's own TLS handshake sends its full chain
-# (leaf -> intermediate -> root) on every connection, so trusting the root
-# lets a future intermediate rotation (this one is already named "V2",
-# implying a "V1" existed before it) validate automatically with no update
-# needed here, rather than breaking the way this integration's setup flow
-# broke before this file existed at all (see the "Fix missing CA bundle..."
-# commit). Trusting the intermediate directly, like the app does, would not
+# We trust the ROOT CA here instead, deliberately: the server's own TLS
+# handshake sends its full chain (leaf -> intermediate -> root) on every
+# connection, so trusting the root lets a future intermediate rotation (the
+# current one is already named "V2", implying a "V1" existed before it)
+# validate automatically with no update needed here, rather than breaking
+# the way this integration's setup flow broke before this file existed at
+# all. Trusting the intermediate directly, like the app does, would not
 # survive that.
 #
 # Provenance - IMPORTANT, read before replacing this file: this root
@@ -120,7 +104,7 @@ _HEADERS = {
     "Content-Type": "application/json",
     "User-Agent": USER_AGENT,
     "version": SDK_VERSION,
-    "app-version": SDK_VERSION,  # com.instabug...Header.APP_VERSION = "app-version"
+    "app-version": SDK_VERSION,  # a second, separate header the server also expects
 }
 
 
@@ -138,6 +122,9 @@ class SddError(Exception):
 # --------------------------------------------------------------------------
 
 def _post(path: str, body: dict) -> dict:
+    """POST body as JSON to path, raising SddError on any request failure or
+    non-2xx response. Returns the parsed JSON response body (or {} if empty).
+    """
     url = BASE_URL + path
     verify = str(CA_BUNDLE_PATH) if CA_BUNDLE_PATH.exists() else True
     try:
@@ -152,7 +139,7 @@ def _post(path: str, body: dict) -> dict:
 
 
 # --------------------------------------------------------------------------
-# Pairing / session establishment (com.smartdoordevices.client.sdk.d.s / d.b)
+# Pairing / session establishment
 # --------------------------------------------------------------------------
 
 def remote_register(
@@ -178,35 +165,27 @@ def remote_register(
 
 
 # --------------------------------------------------------------------------
-# app/v3migrate (com.smartdoordevices.client.sdk.d.j LegacyCredentialMigrator)
-# - the one-time bootstrap that turns a legacy (v2, no phoneKey) credential
-# from remote_register() into a real v3 credential set. Normally triggered
-# automatically by the real app's HubConnection.login() the first time it's
-# called after a fresh registration - see the sequence diagram and "How a
-# client gets its phoneKey" in ../README.md. Wire format confirmed correct
-# via a real live captured exchange (2026-07-31) for every plaintext field;
-# the two encrypted blobs (data/migrationData) weren't decryptable from that
-# capture alone (needs the legacy phoneSecret, which requires also capturing
-# app/remoteregister - not yet done), so this implementation's crypto is
-# static-analysis-derived and not yet confirmed byte-correct end-to-end
-# against the real server. See dead-ends.md for what didn't work finding
-# this the hard way.
+# app/v3migrate - the one-time bootstrap that turns the legacy (no phoneKey)
+# credential from remote_register() into a full v3 credential set (phoneKey,
+# hubKey, phoneSecret, phonePassword). Call v3migrate_prepare() once per
+# migration, then retry v3migrate_attempt() on that same session until it
+# returns a completed result instead of a pending ack - see
+# v3migrate_prepare()'s docstring for why reusing the same session across
+# retries matters.
 # --------------------------------------------------------------------------
 
 _RANDOM_PASSWORD_CHARSET = string.digits + string.ascii_lowercase + string.ascii_uppercase
 
 
 def _random_password(length: int) -> str:
-    """Matches com.smartdoordevices.client.sdk.a.h.b(int) - alphanumeric only,
-    no symbols.
-    """
+    """Generate a random alphanumeric password (no symbols) of the given length."""
     return "".join(secrets.choice(_RANDOM_PASSWORD_CHARSET) for _ in range(length))
 
 
 def _legacy_aes_key_iv(key_str: str, iv_str: str) -> tuple[bytes, bytes]:
-    """The OLDER AES scheme app/v3migrate's `data` field uses - AES-128 with
-    MD5-derived key/IV (com.smartdoordevices.client.sdk.d.a), distinct from
-    aes_encrypt/decrypt's SHA-256/AES-256 scheme used everywhere else.
+    """Derive an AES-128 key/IV pair via MD5. Used only for app/v3migrate's
+    `data` field, which uses this older, weaker scheme - everywhere else
+    uses the SHA-256/AES-256 scheme in aes_encrypt()/aes_decrypt() below.
     """
     key = hashlib.md5(key_str.encode("utf-8")).digest()  # 16 bytes -> AES-128
     iv = hashlib.md5(iv_str.encode("utf-8")).digest()  # 16 bytes
@@ -228,26 +207,19 @@ def _legacy_aes_decrypt(key_str: str, iv_str: str, b64_ciphertext: str) -> str:
 
 
 def _rsa_public_key_pkcs1_b64(rsa_key) -> str:
-    """The RSA public key encoding app/v3migrate's outer `phoneKey` field (and
-    the public key embedded in the encrypted `data` blob) uses - bare PKCS#1
-    RSAPublicKey DER (SEQUENCE{modulus, publicExponent}), NOT the standard
-    294-byte X.509 SubjectPublicKeyInfo wrapper. Matches
-    com.smartdoordevices.client.sdk.a.g.a(PublicKey) exactly: confirmed
-    byte-for-byte 2026-07-31 - Java slices the last 270 bytes off the full
-    X.509 SPKI DER, which is exactly this 270-byte PKCS#1 structure, and the
-    resulting base64 prefix ("MIIBCg...") matches a real captured phoneKey
-    value exactly.
+    """Encode an RSA public key the way app/v3migrate's outer `phoneKey`
+    field (and the public key embedded in its encrypted `data` blob) expect:
+    bare PKCS#1 RSAPublicKey DER (SEQUENCE{modulus, publicExponent}), not the
+    standard 294-byte X.509 SubjectPublicKeyInfo wrapper.
     """
     der = DerSequence([rsa_key.n, rsa_key.e]).encode()
     return base64.b64encode(der).decode("ascii")
 
 
 def _ec_public_key_uncompressed_b64(public_key) -> str:
-    """Raw uncompressed EC point (0x04 || X(32) || Y(32), 65 bytes total),
-    matching com.smartdoordevices.client.sdk.a.e's public key encoding - also
-    not the X.509 SPKI wrapper (Java manually prepends a fixed EC P-256
-    AlgorithmIdentifier header only when *decoding* one of these, via
-    a/e.java's b(String); the encoded form itself is just the raw point).
+    """Encode an EC public key as a raw uncompressed point
+    (0x04 || X(32) || Y(32), 65 bytes total) - not the X.509 SPKI wrapper
+    v3migrate's EC half otherwise expects.
     """
     numbers = public_key.public_numbers()
     raw = b"\x04" + numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
@@ -269,16 +241,13 @@ def v3migrate_prepare(
     """Generate the one-time keypairs/values for a v3migrate bootstrap.
 
     Do this ONCE per migration and reuse the returned session dict across
-    every retry via v3migrate_attempt() - matches d/j.java's constructor,
-    which generates its RSA/EC keypair and random newPhonePassword exactly
-    once (cached in instance fields) and resends the SAME phoneKey/EC-half/
-    newPhonePassword on every retry, confirmed against a real capture: all
-    four attempts of one real migration sent the identical phoneKey value,
-    only time/data/signature differed between attempts. Regenerating fresh
-    keys on every retry (an earlier version of this code did exactly that)
-    makes the server treat each retry as an unrelated migration attempt that
-    never gets to complete - confirmed live 2026-07-31, it just stays
-    "pending" forever.
+    every retry via v3migrate_attempt(). The server tracks a migration
+    attempt by the phoneKey/EC-half/newPhonePassword it was first given, so
+    generating fresh keys on every retry makes it treat each retry as an
+    unrelated attempt that never gets to complete - it just stays "pending"
+    forever. Resending the same session's keys on every retry (only the
+    time/encrypted-data/signature change between attempts) is what lets a
+    migration actually finish.
     """
     return {
         "bsid": bsid,
@@ -294,10 +263,9 @@ def v3migrate_prepare(
 
 def v3migrate_attempt(session: dict) -> dict:
     """Send ONE app/v3migrate attempt using a session from v3migrate_prepare(),
-    reusing its already-generated keys - matches d/j.java's performQuery(),
-    called on a 1s-interval timer, which reuses the same instance fields on
-    every call and only recomputes time/the encrypted data/the signature
-    fresh each time.
+    reusing its already-generated keys. Meant to be called repeatedly on a
+    short interval (e.g. once a second) against the same session until it
+    stops returning a pending result.
 
     Returns a dict with the new phoneKey (RSA private key, PKCS#8 DER
     base64), hubKey (as given by the server), phoneSecret (new, ECDH-derived,
@@ -320,19 +288,16 @@ def v3migrate_attempt(session: dict) -> dict:
     rsa_pub_b64 = _rsa_public_key_pkcs1_b64(rsa_key.publickey())
     ec_pub_b64 = _ec_public_key_uncompressed_b64(ec_private_key.public_key())
 
-    # com.smartdoordevices.client.sdk.d.j$b - the encrypted inner blob
+    # the encrypted inner blob v3migrate expects for its "data" field
     inner = json.dumps({
         "phoneKey": rsa_pub_b64,
         "newPhoneSecretPhoneHalf": ec_pub_b64,
         "newPhonePassword": new_phone_password,
     })
-    # SystemClock.currentThreadTimeMillis() in the real app (confirmed live
-    # 2026-07-31 - real captured values were small integers like 1/8/30/4546,
-    # not wall-clock epoch millis). Any value works here as long as it's
-    # consistent with what's reported in the "time" field below, since it's
-    # purely a local IV-derivation seed, never validated by the server
-    # against wall-clock time. Recomputed fresh on every attempt, unlike the
-    # keys above.
+    # Any value works here as long as it's consistent with what's reported in
+    # the "time" field below, since it's purely a local IV-derivation seed,
+    # never validated by the server against wall-clock time. Recomputed
+    # fresh on every attempt, unlike the keys above.
     time_val = secrets.randbelow(100_000) + 1
     encrypted_data = _legacy_aes_encrypt(legacy_phone_secret, str(time_val), inner)
 
@@ -360,9 +325,8 @@ def v3migrate_attempt(session: dict) -> dict:
         # difference instead of looping blindly on a real failure.
         return {"pending": True, "ack": response}
 
-    # Response's data blob uses phoneId (the string itself, not a number) as
-    # the IV-derivation seed, not the request's numeric "time" - confirmed
-    # via static analysis of d/j.java's handleResponse().
+    # The response's data blob uses phoneId (the string itself, not a
+    # number) as the IV-derivation seed, not the request's numeric "time".
     decrypted = _legacy_aes_decrypt(legacy_phone_secret, phone_id, response["migrationData"])
     migration_data = json.loads(decrypted)
     hub_public_key = _ec_public_key_from_uncompressed_b64(migration_data["newPhoneSecretHubHalf"])
@@ -397,8 +361,7 @@ def v3migrate(
 
 
 # --------------------------------------------------------------------------
-# Crypto (com.smartdoordevices.client.sdk.a.a / a.f) - verified byte-correct
-# against the app's own baked-in self-test vectors, see verify_crypto.py
+# Crypto primitives shared by the RPC channel and v3migrate.
 # --------------------------------------------------------------------------
 
 def _aes_key_iv(key_str: str, iv_str: str) -> tuple[bytes, bytes]:
@@ -427,10 +390,9 @@ def hmac_sha256(key_str: str, message: str) -> str:
 
 
 def rsa_sign(phone_key_b64: str, message: str) -> str:
-    """RSA-2048/SHA512withRSA (PKCS#1 v1.5) signature, matching
-    com.smartdoordevices.client.sdk.a.g.a(PrivateKey, String) exactly:
-    phone_key_b64 is the PKCS#8 DER-encoded RSA private key, base64-encoded
-    (Android Base64.NO_WRAP), same as what's persisted as `phoneKey`.
+    """RSA-2048/SHA512withRSA (PKCS#1 v1.5) signature over message.
+    phone_key_b64 is the PKCS#8 DER-encoded RSA private key, base64-encoded -
+    the same form persisted as `phoneKey` elsewhere in this module.
     """
     key = RSA.import_key(base64.b64decode(phone_key_b64))
     h = SHA512.new(message.encode("utf-8"))
@@ -438,19 +400,12 @@ def rsa_sign(phone_key_b64: str, message: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# The one real RPC channel (com.smartdoordevices.client.sdk.e.g "WebChannel",
-# e.a's static envelope builder). POST appv3/message, path/data payload
-# AES-encrypted, wrapped with hubId/phoneId/requestId/time/mac/signature.
-# `mac` is the literal string "NOKEY" when no session key exists yet
-# (com.smartdoordevices.client.sdk.a.d.f() falls back to this exact sentinel)
-# - i.e. for the very first `auth` call. The RSA `signature` field
-# (com.smartdoordevices.client.sdk.e.a's static builder, confirmed via
-# ../java-harness/) is computed unconditionally for every call, over the
-# exact same "hubId:phoneId:time:requestId:encryptedRequest" string as the
-# mac - requires a real phoneKey, which this codebase could only obtain by
-# extracting one from an already-authenticated real app session (see
-# ../frida/), not by deriving/bootstrapping one itself (that mechanism is
-# still unknown - see ../README.md "Current status").
+# The RPC channel: POST appv3/message with an AES-encrypted path/data
+# payload, wrapped with hubId/phoneId/requestId/time/mac/signature. `mac` is
+# the literal string "NOKEY" when no session key exists yet - i.e. for the
+# very first `auth` call. The RSA `signature` field is included whenever a
+# phone_key is available, computed over the same
+# "hubId:phoneId:time:requestId:encryptedRequest" string as the mac.
 #
 # IMPORTANT: appv3/message's own HTTP response is just an ack (e.g.
 # {"bsid": "..."}, HTTP 202) - it is NOT the RPC result. The real result is
@@ -458,9 +413,8 @@ def rsa_sign(phone_key_b64: str, message: str) -> str:
 # {"messages": [...]}, each entry carrying the same requestId as the request
 # it answers plus its own encrypted `response` field (same AES scheme,
 # IV-seeded by that entry's own `time`, not the original request's time).
-# Confirmed live 2026-07-31 by decrypting real appv3/poll traffic - see
-# ../README.md. call_and_wait() below is what actually gets you real data;
-# rpc_call() alone only gets you the ack.
+# call_and_wait() below is what actually gets you real data; rpc_call()
+# alone only gets you the ack.
 # --------------------------------------------------------------------------
 
 def _signed_message_body(
@@ -472,6 +426,9 @@ def _signed_message_body(
     session_key: str | None = None,
     phone_key: str | None = None,
 ) -> dict:
+    """Build the common signed/encrypted envelope every appv3/message and
+    appv3/poll request needs - see the module comment above for the shape.
+    """
     timestamp_ms = int(time.time() * 1000)
     encrypted = aes_encrypt(phone_secret, str(timestamp_ms), plaintext)
     signing_string = f"{bsid}:{phone_id}:{timestamp_ms}:{request_id}:{encrypted}"
@@ -499,7 +456,7 @@ def rpc_call(
     phone_key: str | None = None,
 ) -> dict:
     """Fire off an RPC call (auth, getDevices, sendDeviceCommand, ...) over the
-    real appv3/message channel and return ONLY the immediate HTTP ack (e.g.
+    appv3/message channel and return ONLY the immediate HTTP ack (e.g.
     {"bsid": "..."}) - not the real result, which is delivered separately via
     poll()/call_and_wait(). Prefer call_and_wait() unless you specifically
     want fire-and-forget behaviour.
@@ -507,8 +464,8 @@ def rpc_call(
     Pass session_key once authenticate() has returned one, to MAC-sign the
     request properly instead of using the "NOKEY" bootstrap sentinel. Pass
     phone_key (the RSA private key, PKCS#8 DER base64) to include the
-    required `signature` field - without it the real server returns 403
-    Forbidden for every call, confirmed 2026-07-30.
+    required `signature` field - without it the server returns 403 Forbidden
+    for every call.
     """
     envelope = json.dumps({"path": path, "data": data})
     body = _signed_message_body(bsid, phone_id, phone_secret, envelope, str(uuid.uuid4()), session_key, phone_key)
@@ -524,18 +481,15 @@ def poll(
 ) -> list[dict]:
     """Long-poll appv3/poll once and return whatever real messages have
     arrived since the last call, decrypted. The request body's plaintext is
-    always the literal string "{}" and its requestId is always "" - matches
-    the real app's own appv3/poll calls exactly (confirmed live 2026-07-31),
-    unlike appv3/message where those fields carry the actual RPC.
+    always the literal string "{}" and its requestId is always "", unlike
+    appv3/message where those fields carry the actual RPC.
 
-    The "messages" array can contain two different shapes (confirmed live
-    2026-07-31, and matches the dispatcher in HubConnection.a(a, JsonObject)
-    in the decompiled SDK): RPC responses, keyed by "response" - the answer
-    to a specific appv3/message call, correlated by requestId; and
-    unsolicited "event" pushes (state-change notifications broadcast
-    independently of any request we made, e.g. triggered by our own
-    sendDeviceCommand's side effect), keyed by "event"/"eventType" instead,
-    with no requestId at all.
+    The "messages" array can contain two different shapes: RPC responses,
+    keyed by "response" - the answer to a specific appv3/message call,
+    correlated by requestId; and unsolicited "event" pushes (state-change
+    notifications broadcast independently of any request we made, e.g.
+    triggered by our own sendDeviceCommand's side effect), keyed by
+    "event"/"eventType" instead, with no requestId at all.
 
     Returns a list of dicts, one per message:
     {"type": "response", "requestId": ..., "data": <decrypted parsed JSON>}
@@ -601,11 +555,10 @@ def authenticate(
     timeout: float = DEFAULT_POLL_TIMEOUT_SECONDS,
     poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
 ) -> dict:
-    """The real session-establishment call (com.smartdoordevices.client.sdk.f.a,
-    path "auth"), sent over appv3/message - NOT app/connect, which is
-    legacy-v2-only and never called by a fresh v3 account.
+    """The session-establishment call (path "auth"), sent over appv3/message
+    - not app/connect, which this client never uses.
 
-    Returns the real decrypted response, confirmed live 2026-07-31:
+    Returns the decrypted response:
     {"data": {"duration": {"value": ...}, "key": "<session key>",
     "expiresIn": ...}, "appTimeout": ..., "errorCode": 0, "state": 0} - the
     session key to pass as session_key to later calls is response["data"]["key"].
@@ -626,13 +579,12 @@ def get_devices(
     timeout: float = DEFAULT_POLL_TIMEOUT_SECONDS,
     poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
 ) -> dict:
-    """Returns the real decrypted device list (confirmed live 2026-07-31),
-    each device carrying position/lockLocked/offline/openControllable/
-    closeControllable/stopControllable/pendingCommand/lightOn/auxiliaryOn/
+    """Returns the decrypted device list, each device carrying
+    position/lockLocked/offline/openControllable/closeControllable/
+    stopControllable/pendingCommand/lightOn/auxiliaryOn/
     remoteControlLockoutOn/phoneLockoutOn/advancedAccess/advancedParameters/
-    peBeam*/log (last command) and more - see ../README.md for the full
-    field-by-field breakdown. There is no single doorState enum string; infer
-    state from position + pendingCommand + log.deviceCommand.
+    peBeam*/log (last command) and more. There is no single doorState enum
+    string; infer state from position + pendingCommand + log.deviceCommand.
     """
     return call_and_wait(
         bsid, phone_id, phone_secret, "getDevices", {}, session_key, phone_key,
@@ -650,13 +602,12 @@ def get_device_logs(
     timeout: float = DEFAULT_POLL_TIMEOUT_SECONDS,
     poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
 ) -> dict:
-    """Returns the real decrypted per-device activity log (confirmed live
-    2026-07-31) - this is the closest thing the API has to the app's
-    "messages"/activity list; there is no separate notification-history RPC
-    (checked - none appeared in any captured traffic). Each entry in
-    response["data"] has deviceCommand (see DEVICE_COMMAND), time, logType,
-    logSource, logId, and userId/phoneId when a specific account triggered it
-    (absent for hub-originated events like a sensor auto-close).
+    """Returns the decrypted per-device activity log - the closest thing the
+    API has to an activity/notification history; there is no separate
+    notification-history endpoint. Each entry in response["data"] has
+    deviceCommand (see DEVICE_COMMAND), time, logType, logSource, logId, and
+    userId/phoneId when a specific account triggered it (absent for
+    hub-originated events like a sensor auto-close).
     """
     return call_and_wait(
         bsid, phone_id, phone_secret, "getDeviceLogs", {"deviceId": device_id}, session_key, phone_key,
@@ -664,7 +615,8 @@ def get_device_logs(
     )
 
 
-# com.smartdoordevices.client.sdk.model.device.DeviceCommand - the subset relevant to garage doors
+# The deviceCommand codes relevant to garage doors - the API's full command
+# set is larger (it covers other device types too), only these are used here.
 DEVICE_COMMAND = {
     "OPEN": 2,
     "STOP": 3,
@@ -688,6 +640,9 @@ def send_device_command(
     timeout: float = DEFAULT_POLL_TIMEOUT_SECONDS,
     poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
 ) -> dict:
+    """Send a device command (open/close/stop/light on/off - see
+    DEVICE_COMMAND) and wait for its real result via call_and_wait().
+    """
     code = DEVICE_COMMAND[command.upper()]
     return call_and_wait(
         bsid, phone_id, phone_secret, "sendDeviceCommand",
