@@ -4,3 +4,15 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+
+# Credential-shaped files that should never exist in this repo at all (see
+# CLAUDE.md "No secrets here, ever" - real credentials only ever belong in
+# Home Assistant's own config entry storage) - ignored defensively, matching
+# at any directory depth, in case one gets created locally for manual
+# testing and almost committed.
+.sdd_credentials.json
+credentials.json
+secrets.json
+secrets.yaml
+.env
+.env.*
