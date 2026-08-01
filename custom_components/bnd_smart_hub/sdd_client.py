@@ -1,21 +1,11 @@
 """
-Standalone client for the Smart Door Devices (SDD) WAN cloud API - the
-shared backend behind B&D and several sibling brands' garage door apps (see
-the main README's "Brands using SDD"). Covers the full client lifecycle:
-pairing a new client with a join code (remote_register()), upgrading that
-pairing into a full session credential set (v3migrate_prepare()/
-v3migrate_attempt()), authenticating (authenticate()), and day-to-day
-operation (get_devices(), send_device_command(), get_device_logs()).
+Standalone client for the Smart Door Devices (SDD) WAN cloud API.
 
-**This is a copy of ../../wan-api/client/sdd_client.py** in the sibling
-research repo (that's the canonical, tested copy - see its test suite at
-../../wan-api/client/tests/). This copy exists because HACS only
-distributes the contents of custom_components/<domain>/, so the integration
-needs to be self-contained rather than importing across the parent repo.
-Keep the two in sync manually when the protocol implementation changes.
-
-Never hardcode real credentials in this file, or commit them anywhere in
-this repo.
+Covers the full client lifecycle:
+* pairing a new client with a join code (remote_register()).
+* upgrading that pairing into a full session credential set (v3migrate_prepare()/v3migrate_attempt()).
+* authenticating (authenticate()).
+* day-to-day operation (get_devices(), send_device_command(), get_device_logs()).
 """
 
 from __future__ import annotations
@@ -69,9 +59,9 @@ REQUEST_TIMEOUT_SECONDS = 15
 # The server presents a certificate chain signed by its own private CA, so
 # requests need a trusted copy of that CA to validate it - the public CA
 # trust store alone rejects it with "self-signed certificate in certificate
-# chain". The official app pins to the Intermediate CA specifically.
+# chain".
 #
-# We trust the ROOT CA here instead, deliberately: the server's own TLS
+# We trust the SDD ROOT CA here, deliberately: the server's own TLS
 # handshake sends its full chain (leaf -> intermediate -> root) on every
 # connection, so trusting the root lets a future intermediate rotation (the
 # current one is already named "V2", implying a "V1" existed before it)
@@ -84,16 +74,11 @@ REQUEST_TIMEOUT_SECONDS = 15
 # certificate was obtained via a direct live TLS connection to
 # version3.smartdoordevices.com from the public internet (`openssl s_client
 # -connect version3.smartdoordevices.com:443 -showcerts`), reading whatever
-# chain the server happened to present at that moment - NOT extracted from
-# the official app's own bundled keystore the way the (now-superseded)
-# intermediate cert this replaced was. Its self-signature was checked
-# (`openssl verify -CAfile <this file> <this file>` -> OK) and its issuer
-# name matches what the app-extracted intermediate independently reported as
-# ITS issuer, which is decent corroboration - but unlike the intermediate,
-# this file has not been cross-checked against anything actually shipped
-# inside the app itself. A live TLS fetch is trusting whatever the network
-# path to that server handed back at the time, not an artifact pulled
-# directly from vendor-controlled app resources.
+# chain the server happened to present at that moment.
+#
+# Its self-signature was checked (`openssl verify -CAfile <this file> <this file>` -> OK)
+# and its issuer name matches what the app-extracted intermediate independently reported as
+# ITS issuer, which is decent corroboration.
 #
 # Kept alongside this file (not a sibling "reference/" dir like the source
 # copy) because HACS only ever pulls custom_components/bnd_smart_hub/ itself -
