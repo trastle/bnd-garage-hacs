@@ -43,7 +43,9 @@ class BnDGarageLight(CoordinatorEntity[BnDSmartHubCoordinator], LightEntity):
 
     @property
     def _device(self) -> dict:
-        return self.coordinator.data[self._device_id]
+        # Merges in any optimistic overlay from a just-sent command - see
+        # BnDSmartHubCoordinator.device_data().
+        return self.coordinator.device_data(self._device_id)
 
     @property
     def device_info(self) -> DeviceInfo:

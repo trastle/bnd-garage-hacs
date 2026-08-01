@@ -34,5 +34,12 @@ DEVICE_COMMAND_LIGHT_OFF = "LIGHT_OFF"
 # ../../wan-api/README.md's DeviceCommand table. PART_OPEN_1/2/3 and the
 # OPEN_PERCENT_* codes also mean "opening" but haven't been exercised live;
 # only the plain OPEN/CLOSE codes are included here deliberately.
-OPENING_COMMAND_CODES = {2}
-CLOSING_COMMAND_CODES = {4}
+#
+# COMMAND_CODE_OPEN/CLOSE are the same two codes, named individually because
+# coordinator.py's optimistic-state overlay needs to write "the" open/close
+# code we ourselves send, not just check membership in a set.
+COMMAND_CODE_OPEN = 2
+COMMAND_CODE_CLOSE = 4
+
+OPENING_COMMAND_CODES = {COMMAND_CODE_OPEN}
+CLOSING_COMMAND_CODES = {COMMAND_CODE_CLOSE}

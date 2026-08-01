@@ -19,7 +19,15 @@ Because these are standard Home Assistant entity types, they work with everythin
 
 ## Polling schedule
 
-State (door position, light) is polled on a day/night schedule rather than one fixed interval - by default, every 3 minutes from 6am to 10pm and every 15 minutes overnight, on the theory that a physically idle garage door doesn't need checking as often while everyone's asleep. Configurable per-hub afterward via Settings → Devices & Services → B&D Smart Hub → Configure (day/night start times and both intervals). A command sent through Home Assistant (open/close/light) always triggers an immediate refresh regardless of the schedule.
+State (door position, light) is polled on a day/night schedule rather than one fixed interval - by default, every 3 minutes from 6am to 10pm and every 15 minutes overnight, on the theory that a physically idle garage door doesn't need checking as often while everyone's asleep. Configurable per-hub afterward via Settings → Devices & Services → B&D Smart Hub → Configure (day/night start times and both intervals).
+
+## Command feedback
+
+Sending a command (open/close/stop/light) does three things beyond the plain API call, so a tap gets a response instead of sitting there until the next scheduled poll happens to land:
+
+- **Instant state** - the entity shows "Opening"/"Closing"/the new light state immediately, before the command even reaches the network, then gets confirmed (or corrected) by the next real poll.
+- **Fast polling** - polls every 3s for up to 60s after a command, instead of waiting out the day/night schedule, so the real state catches up quickly. Stops early once nothing's left mid-transition.
+- **5s cooldown per device** - a second command to the same device within 5s of the last one is rejected (guards against accidental double-taps). Stop is exempt from being blocked by this, so a door can always be interrupted immediately.
 
 Every refresh also checks whether it's been 24h since the last authentication and, if so, silently re-authenticates and stores the fresh session key. This is defensive/"for good measure" rather than a fix for a known problem - nothing in testing has shown the session key actually expiring - so a failed refresh attempt is logged and retried on the next cycle rather than treated as an error. The 24h timer isn't persisted across a Home Assistant restart; if HA restarts more often than every 24h, the timer effectively resets each time (a real gap, but a low-stakes one for what this is trying to guard against).
 
