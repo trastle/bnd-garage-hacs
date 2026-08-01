@@ -70,3 +70,7 @@ Only one combination has been confirmed so far. If you try this on a different m
 ## Attribution
 
 The SDD WAN API this integration talks to isn't officially documented - it was reverse-engineered from one of the apps in the brand family above via static analysis and live traffic capture.
+
+## License
+
+[MIT](LICENSE)
