@@ -1,7 +1,7 @@
 """Constants for the B&D Smart Hub integration.
 
-See ../../wan-api/README.md in the parent repo for the full protocol
-write-up this integration implements against.
+See the sibling research repo's wan-api/README.md for the full Smart Door
+Devices (SDD) protocol write-up this integration implements against.
 """
 
 DOMAIN = "bnd_smart_hub"
@@ -20,9 +20,8 @@ DEFAULT_DAY_END = "22:00"
 DEFAULT_DAY_INTERVAL_MINUTES = 3
 DEFAULT_NIGHT_INTERVAL_MINUTES = 15
 
-# com.smartdoordevices.client.sdk.model.device.DeviceCommand - matches
-# sdd_client.DEVICE_COMMAND, duplicated here so config_flow/coordinator don't
-# need to import sdd_client just for these two names.
+# Matches sdd_client.DEVICE_COMMAND, duplicated here so config_flow/
+# coordinator don't need to import sdd_client just for these two names.
 DEVICE_COMMAND_OPEN = "OPEN"
 DEVICE_COMMAND_CLOSE = "CLOSE"
 DEVICE_COMMAND_STOP = "STOP"
@@ -30,10 +29,11 @@ DEVICE_COMMAND_LIGHT_ON = "LIGHT_ON"
 DEVICE_COMMAND_LIGHT_OFF = "LIGHT_OFF"
 
 # Raw deviceCommand integer codes that mean "the door is currently moving in
-# this direction" when seen in a device's pendingCommand field - see
-# ../../wan-api/README.md's DeviceCommand table. PART_OPEN_1/2/3 and the
-# OPEN_PERCENT_* codes also mean "opening" but haven't been exercised live;
-# only the plain OPEN/CLOSE codes are included here deliberately.
+# this direction" when seen in a device's pendingCommand field - see the
+# sibling research repo's wan-api/README.md DeviceCommand table. PART_OPEN_1/
+# 2/3 and the OPEN_PERCENT_* codes also mean "opening" but haven't been
+# exercised live; only the plain OPEN/CLOSE codes are included here
+# deliberately.
 #
 # COMMAND_CODE_OPEN/CLOSE are the same two codes, named individually because
 # coordinator.py's optimistic-state overlay needs to write "the" open/close

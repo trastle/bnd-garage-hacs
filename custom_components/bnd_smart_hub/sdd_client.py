@@ -1,11 +1,11 @@
 """
-Standalone client for the B&D Smart Hub ("Smart Door Devices" / SDD) WAN
-cloud API - the same cloud service the official B&D Smart Garage Access app
-talks to. Covers the full client lifecycle: pairing a new client with a join
-code (remote_register()), upgrading that pairing into a full session
-credential set (v3migrate_prepare()/v3migrate_attempt()), authenticating
-(authenticate()), and day-to-day operation (get_devices(),
-send_device_command(), get_device_logs()).
+Standalone client for the Smart Door Devices (SDD) WAN cloud API - the
+shared backend behind B&D and several sibling brands' garage door apps (see
+the main README's "Brands using SDD"). Covers the full client lifecycle:
+pairing a new client with a join code (remote_register()), upgrading that
+pairing into a full session credential set (v3migrate_prepare()/
+v3migrate_attempt()), authenticating (authenticate()), and day-to-day
+operation (get_devices(), send_device_command(), get_device_logs()).
 
 **This is a copy of ../../wan-api/client/sdd_client.py** in the sibling
 research repo (that's the canonical, tested copy - see its test suite at
@@ -46,7 +46,7 @@ USER_AGENT = f"sddAndroid-{SDK_VERSION}-python-client(35)"
 # --------------------------------------------------------------------------
 # Endpoints this client uses:
 #
-#   app/remoteregister - pairs a new client using a join code from the B&D app.
+#   app/remoteregister - pairs a new client using a join code from the app.
 #   app/v3migrate       - one-time upgrade of that pairing into a full v3
 #                         session credential set (see v3migrate_prepare()/
 #                         v3migrate_attempt()).
@@ -148,7 +148,7 @@ def remote_register(
     phone_name: str = "HomeAssistant",
     phone_model: str = "HomeAssistant",
 ) -> dict:
-    """Pair a new client using a join/registration code shown in the B&D app.
+    """Pair a new client using a join/registration code shown in the app.
 
     One-time step per client. Returns a dict with (at least) bsid, phoneId,
     phoneSecret, phonePassword, userId, userName, isAdmin - save these, the

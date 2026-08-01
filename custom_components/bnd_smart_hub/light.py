@@ -1,5 +1,6 @@
-"""Light entity for the B&D Smart Hub garage light - on/off only, no
-brightness or color control (the hardware doesn't support either)."""
+"""Light entity for the garage light, driven by the Smart Door Devices (SDD)
+cloud API - on/off only, no brightness or color control (the hardware
+doesn't support either)."""
 
 from __future__ import annotations
 

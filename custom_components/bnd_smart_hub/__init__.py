@@ -1,4 +1,6 @@
-"""The B&D Smart Hub integration."""
+"""The B&D Smart Hub integration - see sdd_client.py for the underlying
+Smart Door Devices (SDD) cloud API client it's built on.
+"""
 
 from __future__ import annotations
 

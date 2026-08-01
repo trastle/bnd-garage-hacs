@@ -1,15 +1,15 @@
 """Config flow for the B&D Smart Hub integration.
 
 Mirrors the reference CLI's `setup` command (see the sibling research repo's
-wan-api/client/cli.py and wan-api/README.md for the protocol this drives):
-pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
-completes) -> auth (appv3/message path=auth). Runs once, at setup time. The
-account password IS stored as part of the config entry's data (alongside
-the device credential set: bsid, phoneId, phoneSecret, phonePassword,
-phoneKey, hubKey, sessionKey) - the coordinator needs it to proactively
-re-authenticate every 24h (see coordinator.py), matching how the real app
-itself resends the real password on every login rather than treating it as
-a one-time bootstrap secret.
+wan-api/client/cli.py and wan-api/README.md for the Smart Door Devices (SDD)
+protocol this drives): pair (app/remoteregister) -> migrate (app/v3migrate,
+retried until it completes) -> auth (appv3/message path=auth). Runs once, at
+setup time. The account password IS stored as part of the config entry's
+data (alongside the device credential set: bsid, phoneId, phoneSecret,
+phonePassword, phoneKey, hubKey, sessionKey) - the coordinator needs it to
+proactively re-authenticate every 24h (see coordinator.py), matching how the
+app itself resends the real password on every login rather than treating it
+as a one-time bootstrap secret.
 """
 
 from __future__ import annotations
@@ -110,7 +110,9 @@ def _do_setup(join_code: str, password: str) -> dict:
 
 
 class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for B&D Smart Hub."""
+    """Handle a config flow for an SDD-platform garage hub, published here
+    as "B&D Smart Hub".
+    """
 
     VERSION = 1
 

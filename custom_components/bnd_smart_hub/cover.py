@@ -1,4 +1,5 @@
-"""Cover entity for the B&D Smart Hub garage door.
+"""Cover entity for the garage door, driven by the Smart Door Devices (SDD)
+cloud API - see sdd_client.py.
 
 This is the entity type Home Assistant's iOS Companion app surfaces in its
 Apple CarPlay "common controls" widget - device_class=GARAGE covers are one
