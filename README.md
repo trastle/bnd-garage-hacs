@@ -1,8 +1,22 @@
 # B&D Smart Hub for Home Assistant
 
-A Home Assistant custom integration for B&D garage door motors fitted with a B&D Smart Hub, talking to the same cloud API the official "B&D Smart Garage Access" app uses. No local network access to the hub is required - everything goes over the same WAN/cloud protocol the app itself uses.
+A Home Assistant custom integration for garage door hubs built on the **Smart Door Devices (SDD)** platform - the shared cloud backend behind several garage door brands' apps, including B&D's "Smart Garage Access" (see **Brands using SDD** below). No local network access to the hub is required - everything goes over the same WAN/cloud protocol those apps use.
 
 **Status: early / unpublished.** Not yet submitted to the HACS default store - install as a HACS custom repository for now.
+
+## Brands using SDD
+
+These apps all talk to the same `smartdoordevices.com` backend under the hood - same API, same envelope format, same account system - all published by Automatic Technology Australia Pty Ltd (ATA):
+
+| Brand | Region | App |
+|---|---|---|
+| B&D | Australia | [B&D Smart Garage Access](https://apps.apple.com/au/app/b-d-smart-garage-access/id1098490196) |
+| ATA / Automatic Technology | Australia | [Automatic Technology](https://apps.apple.com/au/app/automatic-technology/id1057041188) |
+| ATA / Automatic Technology America | United States | [Automatic Technology America](https://play.google.com/store/apps/details?id=com.ata.controlladoor) |
+| Dominator | New Zealand | [Dominator Smart Garage Control](https://play.google.com/store/apps/details?id=nz.com.dominator.controlladoor) |
+| Garador | New Zealand | [Garador Reliable Smart Garages](https://apps.apple.com/nz/app/garador/id1138615088) |
+
+This integration has only been built and tested against a B&D hub (see **Tested hardware** below) - it should work unmodified against any of the others, since they share the same backend, but that's not yet confirmed. If you try it on a different brand, please open an issue with the result either way.
 
 ## Installation
 
@@ -15,8 +29,8 @@ A Home Assistant custom integration for B&D garage door motors fitted with a B&D
 ## Setup
 
 1. Settings → Devices & Services → Add Integration → **B&D Smart Hub**.
-2. Enter a registration/join code from the B&D app (wherever it shows the "add remote access" screen for a new device) and your B&D account password. This pairs a brand-new, independent client identity - separate from the account you use in the official app itself.
-3. **Your account password is stored** as part of the resulting config entry, alongside the device credentials it produces - not written to any separate file, but it does sit in Home Assistant's own config storage (plaintext JSON on disk, protected only by OS file permissions, same as several other cloud integrations that need standing credentials). This is a deliberate tradeoff: the integration needs it to proactively re-authenticate every 24h (see below), the same way the real app resends the actual account password on every login rather than treating it as a one-time secret.
+2. Enter a registration/join code from your app (B&D, ATA, Dominator, Garador - wherever it shows the "add remote access" screen for a new device) and your account password for that app. This pairs a brand-new, independent client identity - separate from the account you use in the app itself.
+3. **Your account password is stored** as part of the resulting config entry, alongside the device credentials it produces - not written to any separate file, but it does sit in Home Assistant's own config storage (plaintext JSON on disk, protected only by OS file permissions, same as several other cloud integrations that need standing credentials). This is a deliberate tradeoff: the integration needs it to proactively re-authenticate every 24h (see below), the same way the app itself resends the actual account password on every login rather than treating it as a one-time secret.
 
 ## What you get
 
@@ -55,4 +69,4 @@ Only one combination has been confirmed so far. If you try this on a different m
 
 ## Attribution
 
-The WAN API this integration talks to isn't officially documented - it was reverse-engineered from the official Android app via static analysis and live traffic capture. This repo doesn't include that research; it only implements the resulting protocol.
+The SDD WAN API this integration talks to isn't officially documented - it was reverse-engineered from one of the apps in the brand family above via static analysis and live traffic capture. This repo doesn't include that research; it only implements the resulting protocol.
