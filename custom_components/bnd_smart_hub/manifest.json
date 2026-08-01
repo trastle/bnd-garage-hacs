@@ -1,6 +1,6 @@
 {
   "domain": "bnd_smart_hub",
-  "name": "B&D Smart Hub",
+  "name": "Smart Door Devices Hub",
   "version": "0.1.0",
   "config_flow": true,
   "iot_class": "cloud_polling",

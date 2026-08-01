@@ -1,13 +1,9 @@
 """
 Offline, deterministic tests for the crypto primitives in sdd_client.py.
 
-Copied from the canonical test suite in the sibling research repo
-(../../garage-door/wan-api/client/tests/test_crypto.py) - keep in sync
-manually alongside sdd_client.py itself (see ../CLAUDE.md). These known-answer
-vectors come directly from the app's own self-test code
-(com.smartdoordevices.client.sdk.a.a.a() and a.f.a()) - see the sibling repo's
-wan-api/README.md. If a refactor ever breaks the key/IV derivation or
-encoding, these fail immediately with no network involved.
+These known-answer vectors come directly from the app's own self-test code.
+If a refactor ever breaks the key/IV derivation or encoding, these fail
+immediately with no network involved.
 """
 
 import base64

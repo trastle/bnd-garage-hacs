@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect your B&D Smart Hub",
-        "description": "Enter a registration/join code from the B&D app (wherever it shows the \"add remote access\" screen for a new device) and your B&D account password. These register this Home Assistant instance as its own independent client, separate from the account you use in the official app. Your account password is stored so this integration can periodically re-authenticate on its own.",
+        "title": "Connect your Smart Door Devices Hub",
+        "description": "Enter a registration/join code from your app (B&D, ATA, Dominator, Garador - wherever it shows the \"add remote access\" screen for a new device) and your account password for that app. These register this Home Assistant instance as its own independent client, separate from the account you use in the app itself. Your account password is stored so this integration can periodically re-authenticate on its own.",
         "data": {
           "join_code": "Registration/join code",
-          "password": "B&D account password"
+          "password": "Account password"
         }
       }
     },
@@ -20,7 +20,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "B&D Smart Hub polling schedule",
+        "title": "Smart Door Devices Hub polling schedule",
         "description": "How often to check the door/light status. A different, usually less frequent, interval can apply overnight.",
         "data": {
           "day_start": "Day starts at",

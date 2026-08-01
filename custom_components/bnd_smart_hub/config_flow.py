@@ -1,15 +1,14 @@
-"""Config flow for the B&D Smart Hub integration.
+"""Config flow for the Smart Door Devices Hub integration.
 
-Mirrors the reference CLI's `setup` command (see the sibling research repo's
-wan-api/client/cli.py and wan-api/README.md for the protocol this drives):
-pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
-completes) -> auth (appv3/message path=auth). Runs once, at setup time. The
-account password IS stored as part of the config entry's data (alongside
-the device credential set: bsid, phoneId, phoneSecret, phonePassword,
-phoneKey, hubKey, sessionKey) - the coordinator needs it to proactively
-re-authenticate every 24h (see coordinator.py), matching how the real app
-itself resends the real password on every login rather than treating it as
-a one-time bootstrap secret.
+Runs the Smart Door Devices (SDD) client bootstrap chain once, at setup
+time: pair (app/remoteregister) -> migrate (app/v3migrate, retried until it
+completes) -> auth (appv3/message path=auth). The account password IS
+stored as part of the config entry's
+data (alongside the device credential set: bsid, phoneId, phoneSecret,
+phonePassword, phoneKey, hubKey, sessionKey) - the coordinator needs it to
+proactively re-authenticate every 24h (see coordinator.py), matching how the
+app itself resends the real password on every login rather than treating it
+as a one-time bootstrap secret.
 """
 
 from __future__ import annotations
@@ -67,7 +66,7 @@ def _do_setup(join_code: str, password: str) -> dict:
     # v3migrate_prepare() generates the RSA/EC keypair and random
     # newPhonePassword ONCE - reusing that same session across every retry
     # below matters, the server needs the same keys resent on every attempt
-    # (see the reference repo's wan-api/README.md "app/v3migrate" for why).
+    # (see v3migrate_prepare()'s docstring in sdd_client.py for why).
     session = sdd_client.v3migrate_prepare(
         bsid=pair_result["bsid"],
         phone_id=pair_result["phoneId"],
@@ -110,7 +109,9 @@ def _do_setup(join_code: str, password: str) -> dict:
 
 
 class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for B&D Smart Hub."""
+    """Handle a config flow for an SDD-platform garage hub, published here
+    as "Smart Door Devices Hub".
+    """
 
     VERSION = 1
 
@@ -122,12 +123,12 @@ class BnDSmartHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _do_setup, user_input[CONF_JOIN_CODE], user_input[CONF_PASSWORD]
                 )
             except sdd_client.SddError as err:
-                _LOGGER.error("B&D Smart Hub setup failed: %s", err)
+                _LOGGER.error("Smart Door Devices Hub setup failed: %s", err)
                 errors["base"] = "cannot_connect"
             else:
                 await self.async_set_unique_id(creds["bsid"])
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=creds.get("name") or "B&D Smart Hub", data=creds)
+                return self.async_create_entry(title=creds.get("name") or "Smart Door Devices Hub", data=creds)
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
 
