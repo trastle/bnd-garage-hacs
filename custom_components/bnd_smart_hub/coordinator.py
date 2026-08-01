@@ -94,6 +94,11 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.entry = entry
+        # set by async_send_command(), read by _scheduled_interval(); None
+        # means "no command-driven fast poll in progress right now". Must be
+        # set before super().__init__() below - it computes the initial
+        # update_interval via self._scheduled_interval(), which reads this.
+        self._fast_poll_until: datetime | None = None
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=self._scheduled_interval())
         data = entry.data
         self.bsid: str = data["bsid"]
@@ -114,9 +119,6 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._optimistic: dict[str, dict] = {}
         # device_id -> when its last command was sent, for COMMAND_COOLDOWN
         self._last_command_at: dict[str, datetime] = {}
-        # set by async_send_command(), read by _scheduled_interval(); None
-        # means "no command-driven fast poll in progress right now"
-        self._fast_poll_until: datetime | None = None
 
     def device_data(self, device_id: str) -> dict:
         """Real device data with any pending optimistic overlay merged on

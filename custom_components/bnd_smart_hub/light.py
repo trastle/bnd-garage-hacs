@@ -50,10 +50,24 @@ class BnDGarageLight(CoordinatorEntity[BnDSmartHubCoordinator], LightEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        # Same identifiers as the cover entity in cover.py - this attaches
-        # the light to the same Home Assistant "device" as the door rather
-        # than creating a separate device for it.
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        # Same identifiers AND the same name/manufacturer/model/sw_version
+        # as the cover entity in cover.py - this attaches the light to the
+        # same Home Assistant "device" as the door rather than creating a
+        # separate device for it. Duplicating the full info (not just
+        # identifiers) matters: __init__.py loads the cover and light
+        # platforms concurrently, so which entity's device_info Home
+        # Assistant sees first to actually create the device isn't
+        # guaranteed - if this one only gave identifiers, an unlucky
+        # ordering could register the device (and generate this entity's
+        # entity_id) before it has a name at all.
+        device = self._device
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.get("name") or "Garage Door",
+            manufacturer="B&D",
+            model=(device.get("model") or "").strip() or None,
+            sw_version=(device.get("firmware") or "").strip() or None,
+        )
 
     @property
     def is_on(self) -> bool | None:
