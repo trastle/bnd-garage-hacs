@@ -82,15 +82,39 @@ REQUEST_TIMEOUT_SECONDS = 15
 # The server presents a chain signed by SmartDoorDevices' own private CA, which
 # is why plain requests (using the public CA bundle) rejects it with
 # "self-signed certificate in certificate chain" - the app validates against
-# this exact intermediate cert instead of the public trust store (see
-# com.smartdoordevices.client.sdk.d.i.b() in the decompiled SDK). Extracted
-# from the app's own bundled BKS keystore (res/raw/smartdoordevices_intermediate_v2.bks)
-# via `keytool -exportcert`, see the sibling research repo's wan-api/README.md for how.
+# this same private CA instead of the public trust store (see
+# com.smartdoordevices.client.sdk.d.i.b() in the decompiled SDK, which pins to
+# the intermediate specifically).
+#
+# We trust the ROOT CA here instead of the intermediate the app itself pins
+# to, deliberately: the server's own TLS handshake sends its full chain
+# (leaf -> intermediate -> root) on every connection, so trusting the root
+# lets a future intermediate rotation (this one is already named "V2",
+# implying a "V1" existed before it) validate automatically with no update
+# needed here, rather than breaking the way this integration's setup flow
+# broke before this file existed at all (see the "Fix missing CA bundle..."
+# commit). Trusting the intermediate directly, like the app does, would not
+# survive that.
+#
+# Provenance - IMPORTANT, read before replacing this file: this root
+# certificate was obtained via a direct live TLS connection to
+# version3.smartdoordevices.com from the public internet (`openssl s_client
+# -connect version3.smartdoordevices.com:443 -showcerts`), reading whatever
+# chain the server happened to present at that moment - NOT extracted from
+# the official app's own bundled keystore the way the (now-superseded)
+# intermediate cert this replaced was. Its self-signature was checked
+# (`openssl verify -CAfile <this file> <this file>` -> OK) and its issuer
+# name matches what the app-extracted intermediate independently reported as
+# ITS issuer, which is decent corroboration - but unlike the intermediate,
+# this file has not been cross-checked against anything actually shipped
+# inside the app itself. A live TLS fetch is trusting whatever the network
+# path to that server handed back at the time, not an artifact pulled
+# directly from vendor-controlled app resources.
 #
 # Kept alongside this file (not a sibling "reference/" dir like the source
 # copy) because HACS only ever pulls custom_components/bnd_smart_hub/ itself -
 # anything this integration needs at runtime has to live inside that directory.
-CA_BUNDLE_PATH = Path(__file__).parent / "sdd-cloud-ca.pem"
+CA_BUNDLE_PATH = Path(__file__).parent / "sdd-root-ca-public.pem"
 
 _HEADERS = {
     "Content-Type": "application/json",
