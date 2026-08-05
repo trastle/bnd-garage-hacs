@@ -38,6 +38,26 @@ def is_light_on(device: dict) -> bool | None:
     return device.get("lightOn")
 
 
+def parse_device_list(response: dict) -> dict[str, dict]:
+    """Validate and reshape a getDevices() response into {deviceId: device}.
+
+    Raises ValueError on anything that doesn't match the expected shape -
+    a malformed or unexpected response (e.g. from a future API change) should
+    fail cleanly with a readable message, not crash partway through a dict
+    comprehension with a raw KeyError/TypeError.
+    """
+    devices = response.get("data") if isinstance(response, dict) else None
+    if not isinstance(devices, list):
+        raise ValueError(f'expected a list under "data", got: {response!r}')
+
+    result: dict[str, dict] = {}
+    for device in devices:
+        if not isinstance(device, dict) or not isinstance(device.get("deviceId"), str):
+            raise ValueError(f'expected a device dict with a "deviceId" string, got: {device!r}')
+        result[device["deviceId"]] = device
+    return result
+
+
 def parse_time_string(value: str) -> dt_time:
     """Parse "HH:MM" or "HH:MM:SS" (what HA's TimeSelector stores) into a
     plain datetime.time - seconds are accepted but ignored, this schedule

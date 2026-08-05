@@ -110,6 +110,47 @@ def test_current_poll_interval_minutes_default_schedule(now, expected_minutes):
     )
 
 
+def test_parse_device_list_returns_devices_keyed_by_id():
+    response = {"data": [_device(deviceId="dev1"), _device(deviceId="dev2")]}
+    assert helpers.parse_device_list(response) == {
+        "dev1": _device(deviceId="dev1"),
+        "dev2": _device(deviceId="dev2"),
+    }
+
+
+def test_parse_device_list_empty_list_is_valid():
+    assert helpers.parse_device_list({"data": []}) == {}
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not a dict",
+        {},  # no "data" key at all
+        {"data": None},
+        {"data": "not a list"},
+        {"data": {"deviceId": "dev1"}},  # a single device dict, not wrapped in a list
+    ],
+)
+def test_parse_device_list_rejects_malformed_top_level_shape(response):
+    with pytest.raises(ValueError):
+        helpers.parse_device_list(response)
+
+
+@pytest.mark.parametrize(
+    "devices",
+    [
+        ["not a dict"],
+        [{"name": "no deviceId field at all"}],
+        [{"deviceId": 12345}],  # deviceId present but not a string
+        [{"deviceId": None}],
+    ],
+)
+def test_parse_device_list_rejects_malformed_device_entries(devices):
+    with pytest.raises(ValueError):
+        helpers.parse_device_list({"data": devices})
+
+
 def test_current_poll_interval_minutes_handles_wraparound_day_window():
     # a day window that itself wraps past midnight (not the default, but the
     # boundary math needs to hold up if someone configures it this way)

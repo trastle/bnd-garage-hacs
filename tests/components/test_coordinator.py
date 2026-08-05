@@ -256,6 +256,17 @@ async def test_update_data_raises_update_failed_on_sdd_error(hass, mock_entry):
             await coordinator._async_update_data()
 
 
+async def test_update_data_raises_update_failed_on_malformed_response(hass, mock_entry):
+    coordinator = await _coordinator(hass, mock_entry)
+
+    # a 200 response that doesn't match the expected shape (e.g. "data"
+    # missing entirely) should fail cleanly via UpdateFailed, not crash with
+    # a raw KeyError/TypeError - see helpers.parse_device_list()
+    with patch(f"{SDD}.get_devices", return_value={"errorCode": 0, "state": 0}):
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+
+
 # --------------------------------------------------------------------------
 # _async_refresh_token_if_due() - proactive 24h re-authentication
 # --------------------------------------------------------------------------

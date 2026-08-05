@@ -194,8 +194,10 @@ class BnDSmartHubCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             )
         except sdd_client.SddError as err:
             raise UpdateFailed(f"Error talking to the Smart Door Devices Hub API: {err}") from err
-        devices = response.get("data", [])
-        data = {device["deviceId"]: device for device in devices}
+        try:
+            data = helpers.parse_device_list(response)
+        except ValueError as err:
+            raise UpdateFailed(f"Unexpected getDevices() response: {err}") from err
 
         # Real data has now arrived for every device, so any optimistic
         # overlay has either been confirmed or superseded - drop it either
